@@ -30,49 +30,49 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-linux:
-    needs: create-release
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          [
-            {
-              arch: "x86_64-unknown-linux-gnu",
-              name: "linux",
-              display: "Linux (x86_64)",
-            },
-          ]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: ${{ matrix.target.arch }}
-          override: true
+  # build-linux:
+  #   needs: create-release
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       target:
+  #         [
+  #           {
+  #             arch: "x86_64-unknown-linux-gnu",
+  #             name: "linux",
+  #             display: "Linux (x86_64)",
+  #           },
+  #         ]
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Install Rust
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         toolchain: stable
+  #         target: ${{ matrix.target.arch }}
+  #         override: true
 
-      - name: Install OpenSSL
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+  #     - name: Install OpenSSL
+  #       run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
 
-      - name: Install X11 development libraries
-        run: sudo apt-get update && sudo apt-get install -y libx11-dev
+  #     - name: Install X11 development libraries
+  #       run: sudo apt-get update && sudo apt-get install -y libx11-dev
 
-      - name: Build
-        run: |
-          cargo build --release --target ${{ matrix.target.arch }}
+  #     - name: Build
+  #       run: |
+  #         cargo build --release --target ${{ matrix.target.arch }}
 
-      - name: Package
-        run: |
-          cd target/${{ matrix.target.arch }}/release
-          tar -czf ${{ env.PROJECT_NAME }}-${{ matrix.target.name }}.tar.gz ${{ env.PROJECT_NAME }}
-          cd -
+  #     - name: Package
+  #       run: |
+  #         cd target/${{ matrix.target.arch }}/release
+  #         tar -czf ${{ env.PROJECT_NAME }}-${{ matrix.target.name }}.tar.gz ${{ env.PROJECT_NAME }}
+  #         cd -
 
-      - name: Upload Release Asset
-        run: |
-          gh release upload ${{ github.ref_name }} ./target/${{ matrix.target.arch }}/release/${{ env.PROJECT_NAME }}-${{ matrix.target.name }}.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Upload Release Asset
+  #       run: |
+  #         gh release upload ${{ github.ref_name }} ./target/${{ matrix.target.arch }}/release/${{ env.PROJECT_NAME }}-${{ matrix.target.name }}.tar.gz
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-macos:
     needs: create-release
