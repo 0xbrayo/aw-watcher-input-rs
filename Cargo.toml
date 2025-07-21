@@ -1,0 +1,22 @@
+[package]
+name = "aw-watcher-input-rs"
+version = "0.1.0"
+edition = "2021"
+description = "ActivityWatch Input Watcher"
+authors = ["ActivityWatch Contributors"]
+readme = "README.md"
+license = "MIT"
+
+[dependencies]
+aw-client-rust = { git = "https://github.com/ActivityWatch/aw-server-rust.git", branch = "master" }
+aw-models = { git = "https://github.com/ActivityWatch/aw-server-rust.git", branch = "master" }
+chrono = "0.4.31"
+config = { version = "0.13.3", features = ["toml"] }
+dirs = "5.0.1"
+hostname = "0.3.1"
+serde = { version = "1.0.188", features = ["derive"] }
+serde_json = "1.0.107"
+toml = "0.7.6"
+clap = { version = "4.4", features = ["derive"] }
+rdev = "0.5.3"
+ctrlc = "3.4.1"
