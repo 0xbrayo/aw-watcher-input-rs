@@ -38,6 +38,10 @@ jobs:
           override: true
           components: rustfmt, clippy
 
+      - name: Install x11 on Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev
+
       - name: Build
         uses: actions-rs/cargo@v1
         with:
