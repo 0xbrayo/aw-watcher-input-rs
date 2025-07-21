@@ -5,6 +5,12 @@ use clap::Parser;
 use config::{Config, ConfigError, File};
 use dirs::config_dir;
 use hostname::get as get_hostname;
+// Use the grab function on Linux when the unstable_grab feature is enabled
+// This allows intercepting all input events before they are delivered to applications
+#[cfg(all(target_os = "linux", feature = "unstable_grab"))]
+use rdev::{grab, Event as RdevEvent, EventType};
+// Use the standard listen function on all other platforms
+#[cfg(not(all(target_os = "linux", feature = "unstable_grab")))]
 use rdev::{listen, Event as RdevEvent, EventType};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -96,51 +102,114 @@ fn create_input_listener_thread(state: Arc<Mutex<InputState>>) -> JoinHandle<()>
     thread::spawn(move || {
         // Set up the callback for input events
         let state_clone = Arc::clone(&state);
-        let callback = move |event: RdevEvent| {
-            // Check if we should continue running
-            if !RUNNING.load(Ordering::SeqCst) {
-                // Force exit from the listen loop by panicking the callback
-                // This is the only reliable way to exit rdev::listen
-                std::process::exit(0);
-            }
 
-            let now = Instant::now();
-            let mut update_activity = false;
-
-            // Lock the state to update
-            if let Ok(mut state_guard) = state_clone.lock() {
-                match event.event_type {
-                    EventType::KeyPress(_) => {
-                        state_guard.presses += 1;
-                        update_activity = true;
-                    }
-                    EventType::ButtonPress(_) => {
-                        state_guard.clicks += 1;
-                        update_activity = true;
-                    }
-                    EventType::MouseMove { x: _, y: _ } => {
-                        state_guard.delta_x += 1;
-                        state_guard.delta_y += 1;
-                        update_activity = true;
-                    }
-                    EventType::Wheel { delta_x, delta_y } => {
-                        state_guard.scroll_x += delta_x.unsigned_abs();
-                        state_guard.scroll_y += delta_y.unsigned_abs();
-                        update_activity = true;
-                    }
-                    _ => {}
+        // Standard input listening mode for non-Linux platforms or when unstable_grab is not enabled
+        #[cfg(not(all(target_os = "linux", feature = "unstable_grab")))]
+        {
+            let callback = move |event: RdevEvent| {
+                // Check if we should continue running
+                if !RUNNING.load(Ordering::SeqCst) {
+                    // Force exit from the listen loop by panicking the callback
+                    // This is the only reliable way to exit rdev::listen
+                    std::process::exit(0);
                 }
 
-                if update_activity {
-                    state_guard.last_activity = now;
-                }
-            }
-        };
+                let now = Instant::now();
+                let mut update_activity = false;
 
-        // Start listening for input events
-        // Note: This is a blocking call that runs until the process exits
-        if let Err(error) = listen(callback) {
-            eprintln!("Error listening for input events: {:?}", error);
+                // Lock the state to update
+                if let Ok(mut state_guard) = state_clone.lock() {
+                    match event.event_type {
+                        EventType::KeyPress(_) => {
+                            state_guard.presses += 1;
+                            update_activity = true;
+                        }
+                        EventType::ButtonPress(_) => {
+                            state_guard.clicks += 1;
+                            update_activity = true;
+                        }
+                        EventType::MouseMove { x: _, y: _ } => {
+                            state_guard.delta_x += 1;
+                            state_guard.delta_y += 1;
+                            update_activity = true;
+                        }
+                        EventType::Wheel { delta_x, delta_y } => {
+                            state_guard.scroll_x += delta_x.unsigned_abs();
+                            state_guard.scroll_y += delta_y.unsigned_abs();
+                            update_activity = true;
+                        }
+                        _ => {}
+                    }
+
+                    if update_activity {
+                        state_guard.last_activity = now;
+                    }
+                }
+            };
+
+            // Start listening for input events
+            // Note: This is a blocking call that runs until the process exits
+            if let Err(error) = listen(callback) {
+                eprintln!("Error listening for input events: {:?}", error);
+            }
+        }
+
+        // Use the grab feature on Linux when enabled
+        // This intercepts events before they reach applications
+        #[cfg(all(target_os = "linux", feature = "unstable_grab"))]
+        {
+            let callback = move |event: RdevEvent| -> Option<RdevEvent> {
+                // Check if we should continue running
+                if !RUNNING.load(Ordering::SeqCst) {
+                    // Force exit from the grab loop
+                    std::process::exit(0);
+                }
+
+                let now = Instant::now();
+                let mut update_activity = false;
+
+                // Lock the state to update
+                if let Ok(mut state_guard) = state_clone.lock() {
+                    match event.event_type {
+                        EventType::KeyPress(_) => {
+                            state_guard.presses += 1;
+                            update_activity = true;
+                        }
+                        EventType::ButtonPress(_) => {
+                            state_guard.clicks += 1;
+                            update_activity = true;
+                        }
+                        EventType::MouseMove { x: _, y: _ } => {
+                            state_guard.delta_x += 1;
+                            state_guard.delta_y += 1;
+                            update_activity = true;
+                        }
+                        EventType::Wheel { delta_x, delta_y } => {
+                            state_guard.scroll_x += delta_x.unsigned_abs();
+                            state_guard.scroll_y += delta_y.unsigned_abs();
+                            update_activity = true;
+                        }
+                        _ => {}
+                    }
+
+                    if update_activity {
+                        state_guard.last_activity = now;
+                    }
+                }
+
+                // Return the event to pass it through without modification
+                Some(event)
+            };
+
+            // Start grabbing input events
+            // Note: This is a blocking call that runs until the process exits
+            if let Err(error) = grab(callback) {
+                eprintln!("Error grabbing input events: {:?}", error);
+                eprintln!("Note: On Linux, this program must be run as root or by a user in the 'input' group");
+                eprintln!("To add your user to the input group: sudo usermod -a -G input $USER");
+                eprintln!("You may need to log out and back in for the changes to take effect");
+                std::process::exit(1);
+            }
         }
     })
 }
@@ -237,7 +306,19 @@ fn main() {
     let _listener_thread = create_input_listener_thread(Arc::clone(&input_state));
 
     println!("Input monitoring thread started");
-    println!("Input detection is now active using rdev");
+
+    #[cfg(not(all(target_os = "linux", feature = "unstable_grab")))]
+    println!("Input detection is now active using rdev listen mode");
+
+    #[cfg(all(target_os = "linux", feature = "unstable_grab"))]
+    {
+        println!("Input detection is now active using rdev grab mode (Linux)");
+        println!("NOTE: This requires your user to be in the 'input' group or to run as root");
+        println!("To add your user to the input group: sudo usermod -a -G input $USER");
+        println!("On some distributions, you may need to use the 'plugdev' group instead");
+        println!("You must log out and back in for group changes to take effect");
+    }
+
     println!("Press Ctrl+C to exit");
 
     // Main polling loop

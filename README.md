@@ -25,6 +25,12 @@ cd aw-watcher-input-rs
 cargo build --release
 ```
 
+To enable the unstable grab feature for Linux (which allows intercepting events):
+
+```bash
+cargo build --release --features="unstable_grab"
+```
+
 The compiled binary will be in `target/release/aw-watcher-input-rs`.
 
 ### Platform Support
@@ -32,7 +38,7 @@ The compiled binary will be in `target/release/aw-watcher-input-rs`.
 This watcher uses the `rdev` crate to provide cross-platform input detection:
 - macOS: Works via macOS accessibility APIs
 - Windows: Uses Windows input hooks
-- Linux: Works with X11 and partial Wayland support
+- Linux: Works with X11 and Wayland (when using the unstable_grab feature)
 
 The watcher tracks:
 - Key presses (without logging specific keys for privacy)
@@ -67,6 +73,30 @@ Available command-line options:
 - `--port`: ActivityWatch server port (default: 5600)
 - `--testing`: Use testing mode (creates a separate bucket)
 - `--poll-time`: Override the polling interval from config (in seconds)
+
+### Using the Grab Feature on Linux
+
+When built with the `unstable_grab` feature, the watcher will use rdev's grab functionality on Linux, which allows it to intercept all input events before they are delivered to applications.
+
+For this to work properly:
+
+1. Build with the grab feature enabled:
+   ```bash
+   cargo build --release --features="unstable_grab"
+   ```
+
+2. Make sure your user is in the `input` group (or run as root, not recommended):
+   ```bash
+   sudo usermod -a -G input $USER
+   ```
+   You'll need to log out and back in for this change to take effect.
+
+3. Run the watcher as usual:
+   ```bash
+   ./target/release/aw-watcher-input-rs
+   ```
+
+The grab feature works with both X11 and Wayland on Linux, providing more reliable input detection.
 
 ### Configuration
 
@@ -123,7 +153,7 @@ The watcher effectively tracks input activity and integrates with ActivityWatch 
 
 ## Current Status and Future Development
 
-This project has implemented cross-platform input detection using the `rdev` crate, which provides monitoring of keyboard and mouse activity.
+This project has implemented cross-platform input detection using the `rdev` crate, which provides monitoring of keyboard and mouse activity. On Linux, it can use the unstable_grab feature for more reliable event interception.
 
 ### Roadmap:
 
@@ -139,6 +169,7 @@ This project has implemented cross-platform input detection using the `rdev` cra
    - Add visualization tools similar to the Python implementation
    - Improve error handling and performance
    - Add optional detailed key logging (with privacy considerations)
+   - Extend the grab feature to more platforms where possible
 
 ### Contributing
 

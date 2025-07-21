@@ -18,5 +18,8 @@ serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.107"
 toml = "0.7.6"
 clap = { version = "4.4", features = ["derive"] }
-rdev = "0.5.3"
+rdev = { version = "0.5.3" }
 ctrlc = "3.4.1"
+
+[features]
+unstable_grab = ["rdev/unstable_grab"]
